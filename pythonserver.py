@@ -1,54 +1,55 @@
 from fastapi import FastAPI, Request
-import uvicorn
-import numpy as np
-import wave
-import struct
 import os
-from scipy.signal import resample
 from datetime import datetime
+import wave
+import numpy as np
+from scipy.signal import resample
 
 app = FastAPI()
-
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+TEMP_FILE = os.path.join(UPLOAD_DIR, "audio_temp.raw")
 
 SAMPLE_RATE = 8000
-RECORD_SECONDS = 10
-NUM_SAMPLES = SAMPLE_RATE * RECORD_SECONDS
 
-@app.post("/upload_audio")
-async def upload_audio(request: Request):
+@app.post("/upload_audio_chunk")
+async def upload_audio_chunk(request: Request):
     raw = await request.body()
-    expected_bytes = NUM_SAMPLES * 2  # 2 bytes per sample
+    if len(raw) == 0:
+        return {"status":"error", "message":"Empty data"}
 
-    if len(raw) != expected_bytes:
-        return {"status": "error", "message": f"Incorrect data length. Expected {expected_bytes}, got {len(raw)}"}
+    # Append chunk to temp raw file
+    with open(TEMP_FILE, "ab") as f:
+        f.write(raw)
 
-    # Convert bytes to integers
-    samples = [struct.unpack('>H', raw[i:i+2])[0] for i in range(0, len(raw), 2)]
+    # If this is the last chunk, convert to WAV
+    # Optional: you can send a finalization request or trigger conversion manually
+    # For demonstration, let's assume 10 chunks → 10s
+    file_size = os.path.getsize(TEMP_FILE)
+    expected_size = SAMPLE_RATE * 10 * 2  # 10s, 16-bit PCM
 
-    # Convert to float -1..1
-    samples = np.array(samples, dtype=np.float32)
-    samples = (samples / 4095.0) * 2 - 1
+    if file_size >= expected_size:
+        # Convert raw to WAV
+        with open(TEMP_FILE, "rb") as f:
+            raw_data = f.read()
+        samples = [int.from_bytes(raw_data[i:i+2], 'big') for i in range(0, len(raw_data), 2)]
+        samples = np.array(samples, dtype=np.float32)
+        samples = (samples / 4095.0) * 2 - 1
+        samples = resample(samples, SAMPLE_RATE*10)  # resample if needed
+        samples = np.clip(samples, -1.0, 1.0)
+        samples_int16 = (samples*32767).astype(np.int16)
 
-    # Resample & pitch modify
-    samples = resample(samples, NUM_SAMPLES)
-    samples = resample(samples, int(NUM_SAMPLES / 0.65))
-    samples = np.clip(samples, -1.0, 1.0)
+        filename = datetime.now().strftime("audio_%Y%m%d_%H%M%S.wav")
+        path = os.path.join(UPLOAD_DIR, filename)
+        with wave.open(path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(SAMPLE_RATE)
+            wf.writeframes(samples_int16.tobytes())
 
-    # Convert to PCM16
-    samples_int16 = (samples * 32767).astype(np.int16)
+        # Remove temp file
+        os.remove(TEMP_FILE)
 
-    # Save WAV
-    filename = datetime.now().strftime("audio_%Y%m%d_%H%M%S.wav")
-    path = os.path.join(UPLOAD_DIR, filename)
-    with wave.open(path, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(SAMPLE_RATE)
-        wf.writeframes(samples_int16.tobytes())
+        return {"status":"OK", "file": filename}
 
-    return {"status": "OK", "file": filename}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    return {"status":"OK", "message": f"Received {len(raw)} bytes"}
