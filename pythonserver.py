@@ -10,6 +10,20 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 TEMP_FILE = os.path.join(UPLOAD_DIR, "audio_temp.raw")
 
+from fastapi.responses import FileResponse
+
+UPLOAD_DIR = "uploads"
+
+@app.get("/download/{filename}")
+def download_file(filename: str):
+    path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(path):
+        return FileResponse(path, filename=filename)
+    return {"status": "error", "message": "File not found"}
+
+
+
+
 SAMPLE_RATE = 8000
 
 @app.post("/upload_audio_chunk")
