@@ -22,9 +22,9 @@ SAMPLE_RATE = 8000  # Hz
 # -----------------------------
 SFTP_HOST = "skillora.space"
 SFTP_PORT = 22
-SFTP_USERNAME = "your_ftp_username"
-SFTP_PASSWORD = "your_ftp_password"
-SFTP_UPLOAD_DIR = "/path/to/uploads"  # e.g., /var/www/html/uploads
+SFTP_USERNAME = "arvin@skillora.space"
+SFTP_PASSWORD = "Rishii030625"
+SFTP_UPLOAD_DIR = "/uploads"  # e.g., /var/www/html/uploads
 
 
 def upload_to_skillora(local_path, filename):
