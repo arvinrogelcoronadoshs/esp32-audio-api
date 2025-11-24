@@ -2,3 +2,6 @@ Flask
 numpy
 scipy
 requests
+MarkupSafe
+Werkzeug
+urllib3
