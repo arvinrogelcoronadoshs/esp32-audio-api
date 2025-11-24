@@ -1,2 +1,5 @@
 #!/bin/bash
-uvicorn pythonserver:app --host 0.0.0.0 --port 8000
+# Ensure script is executable: chmod +x start.sh
+
+echo "Starting Flask server..."
+python pythonserver.py
